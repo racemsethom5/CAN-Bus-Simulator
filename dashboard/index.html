@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CAN Bus Simulator — Live Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0f;
+      color: #e2e8f0;
+      font-family: 'Courier New', monospace;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: .75rem;
+      margin-bottom: 1.25rem;
+    }
+    header h1 { font-size: 1.1rem; color: #22c55e; letter-spacing: .1em; }
+    header .meta { display: flex; gap: 1rem; align-items: center; font-size: .75rem; color: #64748b; }
+
+    .state-badge {
+      padding: .2rem .6rem;
+      border-radius: 4px;
+      font-size: .7rem;
+      font-weight: bold;
+      letter-spacing: .08em;
+    }
+    .state-badge.active  { background: #14532d; color: #22c55e; }
+    .state-badge.warning { background: #7c2d12; color: #f97316; }
+
+    /* ── Layout ──────────────────────────────────────────────── */
+    .grid {
+      display: grid;
+      grid-template-columns: 260px 1fr 280px;
+      gap: 1rem;
+      height: calc(100vh - 90px);
+    }
+
+    .panel {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: .75rem;
+    }
+    .panel-title {
+      font-size: .65rem;
+      letter-spacing: .12em;
+      color: #475569;
+      text-transform: uppercase;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: .4rem;
+    }
+
+    /* ── RPM gauge (SVG) ─────────────────────────────────────── */
+    .rpm-wrap { display: flex; flex-direction: column; align-items: center; gap: .5rem; }
+    #rpm-gauge { width: 200px; height: 200px; }
+    .rpm-readout { font-size: 1.6rem; color: #22c55e; letter-spacing: .05em; }
+    .rpm-label   { font-size: .65rem; color: #475569; }
+
+    /* ── Bar gauges ──────────────────────────────────────────── */
+    .bar-gauge { display: flex; flex-direction: column; gap: .3rem; }
+    .bar-label { display: flex; justify-content: space-between; font-size: .7rem; color: #94a3b8; }
+    .bar-track { background: #1e293b; border-radius: 4px; height: 10px; overflow: hidden; }
+    .bar-fill  {
+      height: 100%;
+      background: #22c55e;
+      border-radius: 4px;
+      transition: width .1s linear;
+    }
+
+    /* ── Brake indicators ────────────────────────────────────── */
+    .brake-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .4rem;
+    }
+    .brake-wheel {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: .4rem;
+      text-align: center;
+      font-size: .65rem;
+      color: #475569;
+      transition: background .1s, color .1s;
+    }
+    .brake-wheel.active { background: #7c2d12; color: #f97316; border-color: #f97316; }
+
+    .abs-badge {
+      padding: .3rem .8rem;
+      border-radius: 4px;
+      text-align: center;
+      font-size: .75rem;
+      font-weight: bold;
+      background: #1e293b;
+      color: #475569;
+      transition: background .15s, color .15s;
+    }
+    .abs-badge.active { background: #1e3a5f; color: #38bdf8; }
+
+    /* ── Message feed ────────────────────────────────────────── */
+    #msg-feed {
+      flex: 1;
+      overflow-y: auto;
+      font-size: .65rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .msg-row {
+      display: grid;
+      grid-template-columns: 60px 50px 24px 1fr;
+      gap: .3rem;
+      padding: 2px 4px;
+      border-radius: 3px;
+      color: #94a3b8;
+    }
+    .msg-row:hover  { background: #1e293b; }
+    .msg-row.error  { color: #f87171; }
+    .msg-ts   { color: #475569; }
+    .msg-id   { color: #38bdf8; }
+    .msg-dlc  { color: #64748b; }
+    .msg-data { font-family: monospace; }
+    .msg-err  { color: #ef4444; font-weight: bold; }
+
+    /* ── Fault log ───────────────────────────────────────────── */
+    #fault-log {
+      flex: 1;
+      overflow-y: auto;
+      font-size: .65rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .fault-row {
+      display: grid;
+      grid-template-columns: 55px 1fr auto;
+      gap: .4rem;
+      padding: 3px 6px;
+      background: #1a0a0a;
+      border-left: 2px solid #ef4444;
+      border-radius: 3px;
+      align-items: center;
+    }
+    .fault-ts   { color: #475569; }
+    .fault-type { color: #f87171; font-weight: bold; }
+    .fault-id   { color: #94a3b8; }
+
+    .phase-wrap { display: flex; align-items: center; gap: .5rem; }
+    #phase-label {
+      font-size: .8rem;
+      color: #a78bfa;
+      letter-spacing: .08em;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>&#9632; CAN BUS SIMULATOR — LIVE DASHBOARD</h1>
+    <div class="meta">
+      <div class="phase-wrap">
+        Phase: <span id="phase-label">IDLE</span>
+      </div>
+      <span id="bus-state" class="state-badge active">ACTIVE</span>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <!-- Left: gauges -->
+    <div class="panel">
+      <div class="panel-title">Engine ECU</div>
+
+      <!-- RPM gauge -->
+      <div class="rpm-wrap">
+        <svg id="rpm-gauge" viewBox="0 0 200 200">
+          <!-- Tick marks -->
+          <g stroke="#1e293b" stroke-width="1.5">
+            <!-- background arc -->
+            <circle cx="100" cy="100" r="85" fill="none" stroke="#0f172a" stroke-width="20"/>
+            <!-- 0–8000 arc background -->
+            <path d="M 34 166 A 85 85 0 1 1 166 166"
+                  fill="none" stroke="#1e293b" stroke-width="18" stroke-linecap="round"/>
+            <!-- red zone arc 6000–8000 -->
+            <path d="M 139.5 40.5 A 85 85 0 0 1 166 166"
+                  fill="none" stroke="#7f1d1d" stroke-width="18" stroke-linecap="round"
+                  opacity="0.6"/>
+          </g>
+          <!-- Center dot -->
+          <circle cx="100" cy="100" r="5" fill="#22c55e"/>
+          <!-- Needle -->
+          <line id="rpm-needle" x1="100" y1="100" x2="100" y2="28"
+                stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"/>
+          <!-- RPM labels -->
+          <text x="24"  y="175" fill="#475569" font-size="9" text-anchor="middle">0</text>
+          <text x="176" y="175" fill="#475569" font-size="9" text-anchor="middle">8k</text>
+          <text x="100" y="22"  fill="#ef4444" font-size="9" text-anchor="middle">6k</text>
+        </svg>
+        <div class="rpm-readout"><span id="rpm-value">800</span></div>
+        <div class="rpm-label">RPM</div>
+      </div>
+
+      <!-- Speed -->
+      <div class="bar-gauge">
+        <div class="bar-label"><span>Speed</span><span id="speed-value">0 km/h</span></div>
+        <div class="bar-track">
+          <div id="speed-fill" class="bar-fill" style="width:0%;background:#38bdf8"></div>
+        </div>
+      </div>
+
+      <!-- Throttle -->
+      <div class="bar-gauge">
+        <div class="bar-label"><span>Throttle</span><span id="throttle-value">0 %</span></div>
+        <div class="bar-track">
+          <div id="throttle-fill" class="bar-fill" style="width:0%"></div>
+        </div>
+      </div>
+
+      <!-- Coolant -->
+      <div class="bar-gauge">
+        <div class="bar-label"><span>Coolant</span><span id="coolant-value">90 °C</span></div>
+        <div class="bar-track">
+          <div id="coolant-fill" class="bar-fill" style="width:60%"></div>
+        </div>
+      </div>
+
+      <div class="panel-title" style="margin-top:.25rem">ABS ECU</div>
+
+      <!-- Brake wheels -->
+      <div class="brake-grid">
+        <div id="brake-FL" class="brake-wheel">FL</div>
+        <div id="brake-FR" class="brake-wheel">FR</div>
+        <div id="brake-RL" class="brake-wheel">RL</div>
+        <div id="brake-RR" class="brake-wheel">RR</div>
+      </div>
+      <div id="abs-indicator" class="abs-badge">ABS</div>
+    </div>
+
+    <!-- Center: message feed -->
+    <div class="panel">
+      <div class="panel-title">Live Message Feed</div>
+      <div style="display:grid;grid-template-columns:60px 50px 24px 1fr;gap:.3rem;font-size:.6rem;color:#334155;padding:0 4px">
+        <span>TIME</span><span>ID</span><span>DLC</span><span>DATA</span>
+      </div>
+      <div id="msg-feed"></div>
+    </div>
+
+    <!-- Right: fault log -->
+    <div class="panel">
+      <div class="panel-title">Fault Injector Log</div>
+      <div id="fault-log"></div>
+    </div>
+
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
