@@ -3,8 +3,7 @@
 A production-accurate C++ simulator of a CAN 2.0A automotive network with three
 ECU nodes, CRC-15 validation, fault injection, and a live TypeScript dashboard.
 
-Built to demonstrate skills directly applicable to embedded software roles at
-companies like **BMW Group**, **Bosch**, **Continental**, and **Vector Informatik**.
+![Dashboard](docs/dashboardd.png)
 
 ---
 
