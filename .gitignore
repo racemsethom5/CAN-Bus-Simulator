@@ -1,0 +1,28 @@
+# Build
+build/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+Makefile
+*.o
+*.a
+*.so
+*.out
+
+# Binary
+can_simulator
+can_tests
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Dashboard
+dashboard/node_modules/
+dashboard/dist/
+
+# GoogleTest fetch cache
+_deps/
